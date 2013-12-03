@@ -2,8 +2,14 @@
 
 
 class Command:
+    """
+    コマンドを表します
+    """
 
     command_name = None
+    pair_command_name = None
+    is_block_command = False
+    is_block_start = False
 
     def __init__(self, command_manager, text_manager, line):
         self.command_manager = command_manager
@@ -26,10 +32,36 @@ class Command:
         ret += ' / command_id:' + self.command_id
         return ret
 
+    def start(self):
+        """
+        コマンドマネージャがこのコマンドにカーソルを合わせたときに呼ばれる関数。
+        正規表現としての評価はまだ実施されていません。
+        @return 評価するコマンドリストのカーソルを次行へ進めて再帰的にコマンド構築処理をする場合True
+        """
+        return False
+
+    def match(self, search):
+        """
+        マッチしたときに呼ばれる関数。
+        @param search マッチしたオブジェクト
+        @return 評価対象のテキストのカーソルを次行へ進める場合True
+        """
+        return True
+
+    def not_match(self):
+        """
+        マッチしなかったときに呼ばれる関数。
+        @return 評価対象のテキストのカーソルを次行へ進める場合True
+        """
+        return False
+
 
 class Anycommand(Command):
 
     command_name = 'any'
+    pair_command_name = None
+    is_block_command = False
+    is_block_start = False
 
     def start(self):
         return True
@@ -44,12 +76,17 @@ class Anycommand(Command):
 class Ifcommand(Command):
 
     command_name = 'if'
+    pair_command_name = 'endif'
+    is_block_command = True
+    is_block_start = True
 
     def start(self):
         self.command_manager.set_command(self)
         return False
 
     def match(self, search):
+        self.command_manager.remove_command(self)
+        self.text_manager.move_index_to_same_line()
         return True
 
     def not_match(self):
@@ -62,6 +99,9 @@ class Ifcommand(Command):
 class Endifcommand(Command):
 
     command_name = 'endif'
+    pair_command_name = 'if'
+    is_block_command = True
+    is_block_start = False
 
     def start(self):
         return True
@@ -76,6 +116,9 @@ class Endifcommand(Command):
 class Loopcommand(Command):
 
     command_name = 'loop'
+    pair_command_name = 'endloop'
+    is_block_command = True
+    is_block_start = True
 
     def start(self):
         self.command_manager.add_loop_counter(self.command_id)
@@ -95,6 +138,9 @@ class Loopcommand(Command):
 class Endloopcommand(Command):
 
     command_name = 'endloop'
+    pair_command_name = 'loop'
+    is_block_command = True
+    is_block_start = False
 
     def start(self):
         # loopの終了合図が見つからないままendに来てしまった。loopの先頭へ戻る
@@ -112,6 +158,8 @@ class Endloopcommand(Command):
 class Searchcommand(Command):
 
     command_name = 'search'
+    pair_command_name = None
+    is_block_command = False
 
     def start(self):
         self.command_manager.set_command(self)
@@ -120,7 +168,13 @@ class Searchcommand(Command):
     def match(self, search):
         if self.keys:
             for i, key in enumerate(self.command_manager.create_keys(self.keys)):
-                self.text_manager.ret[key] = search.group(i + 1)
+                if '[]' in key:
+                    key = key.replace('[]', '')
+                    if not key in self.text_manager.ret:
+                        self.text_manager.ret[key] = []
+                    self.text_manager.ret[key].append(search.group(i + 1))
+                else:
+                    self.text_manager.ret[key] = search.group(i + 1)
         self.command_manager.remove_command(self)
         return True
 

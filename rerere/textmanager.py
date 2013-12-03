@@ -18,16 +18,10 @@ class TextManager:
                 self.__i += 1
                 line = self.list[self.__i]
 
-                print('調査するよ:')
-                print('---->' + line)
-                print(commands)
-                print(self.ret)
                 for mindex, command in enumerate(commands):
                     pattern = re.compile(command.pattern)
                     tmp = pattern.search(line)
                     if tmp:
-                        # あったあとの事後処理
-                        print('atta.')
                         if command.match(tmp):
                             commands = command_manager.next()
                             break
@@ -37,5 +31,4 @@ class TextManager:
                             break
 
         except IndexError:
-            print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
             return self.ret

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 import sys
+import uuid
 from rerere.command import *
 
 START_SYMBOL = '<<'
@@ -15,13 +16,14 @@ class CommandManager:
         self.__commands_all = []  # すべてのコマンド
         self.__lines = []  # すべての行（構文解析後)
         self.__loop_counter = {}
-        self.command_master = ['@if', '@endif', '@loop', '@endloop', '@any']
-        self.text_manager = text_manager
+        self.__command_master = ['@if', '@endif', '@loop', '@endloop', '@search', '@any']
+        self.__text_manager = text_manager
 
-        self.__lines = list(map(lambda x: self.parse(x), mask_str.split('\n')))
-        self.__commands_all = list(map(lambda x: self.convert_command(x), self.__lines))
+        self.__lines = list(map(lambda x: self.__parse(x), mask_str.split('\n')))
+        self.__commands_all = list(map(lambda x: self.__convert_command(x), self.__lines))
+        self.__complement_command_id()
 
-    def parse(self, line):
+    def __parse(self, line):
         if not line:
             line = START_SYMBOL + '@any' + END_SYMBOL  # 空行はanyコマンドにしておく
 
@@ -30,7 +32,7 @@ class CommandManager:
         ret = {}
         if main_str:
             tmp = re.split(r'\s+', main_str.group(1))
-            if tmp[0] in self.command_master:  # コマンドではじまっている
+            if tmp[0] in self.__command_master:  # コマンドではじまっている
                 ret['command_name'] = tmp.pop(0).replace('@', '')
                 ret['attributes'] = {x2[0]: x2[1][1:-1] for x2 in [x.split('=') for x in tmp]}
             else:
@@ -48,10 +50,35 @@ class CommandManager:
 
         return ret
 
-    def convert_command(self, line):
+    def __convert_command(self, line):
         class_c = globals()[line['command_name'].capitalize() + 'command']
-        obj = class_c(self, self.text_manager, line)
+        obj = class_c(self, self.__text_manager, line)
         return obj
+
+    def __complement_command_id(self):
+        block = {}
+
+        def set_block(command_name, command_id):
+            if not command_name in block:
+                block[command_name] = []
+            block[command_name].append(command_id)
+
+        def get_current_command_id(command_name):
+            return block.get(command_name, [])[-1]
+
+        def delete_current_command_id(command_name):
+            block.get(command_name, []).pop()
+
+        for i, command in enumerate(self.__commands_all):
+            if not command.is_block_command:
+                continue
+            if command.is_block_start:
+                if not command.command_id:
+                    command.command_id = str(uuid.uuid4())
+                    set_block(command.command_name, command.command_id)
+            else:
+                command.command_id = get_current_command_id(command.pair_command_name)
+                delete_current_command_id(command.pair_command_name)
 
     def remove_command(self, obj):
         tmp = [x for x in self.__commands if x == obj]
@@ -88,16 +115,9 @@ class CommandManager:
                 return i
         return None
 
-    def get_pair_action_name(self, command_name):
-        if re.search('end', command_name):
-            return command_name.replace('end', '')
-        else:
-            return 'end' + command_name
-
     def search_pair_command_index(self, command):
-        pair_action_name = self.get_pair_action_name(command.command_name)
         for i, v in enumerate(self.__commands_all):
-            if v.command_name == pair_action_name and v.command_id == command.command_id:
+            if v.command_name == command.pair_command_name and v.command_id == command.command_id:
                 return i
         return None
 
