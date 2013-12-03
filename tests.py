@@ -157,6 +157,7 @@ def total_1_test():
     eq_(ret['postage'], '0')
     eq_(ret['total'], '1,779')
 
+
 def total_2_test():
     ret = rerere.search(mask2, test1)
     eq_(ret['order_no'], '200068-20130000-0538897137')
