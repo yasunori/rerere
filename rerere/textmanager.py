@@ -11,7 +11,7 @@ class TextManager:
     def move_index_to_same_line(self):
         self.__i -= 1
 
-    def exec(self, command_manager):
+    def execute(self, command_manager):
         try:
             commands = command_manager.next()
             while True:
