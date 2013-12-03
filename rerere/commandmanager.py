@@ -22,6 +22,7 @@ class CommandManager:
         self.__lines = list(map(lambda x: self.__parse(x), mask_str.split('\n')))
         self.__commands_all = list(map(lambda x: self.__convert_command(x), self.__lines))
         self.__complement_command_id()
+        self.__complement_parent_command_id()
 
     def __parse(self, line):
         if not line:
@@ -80,12 +81,45 @@ class CommandManager:
                 command.command_id = get_current_command_id(command.pair_command_name)
                 delete_current_command_id(command.pair_command_name)
 
+    def __complement_parent_command_id(self):
+        block = {}
+
+        def set_block(command_name, command_id):
+            if not command_name in block:
+                block[command_name] = []
+            block[command_name].append(command_id)
+
+        def get_all_command_ids():
+            ret = []
+            for k, v in block.items():
+                ret += v
+            return ret
+
+        def delete_current_command_id(command_name):
+            block.get(command_name, []).pop()
+
+        for i, command in enumerate(self.__commands_all):
+            command.parent_block_command_ids = get_all_command_ids()
+            if command.is_block_command:
+                if command.is_block_start:
+                    set_block(command.command_name, command.command_id)
+                else:
+                    delete_current_command_id(command.pair_command_name)
+
     def remove_command(self, obj):
         tmp = [x for x in self.__commands if x == obj]
         if tmp:
             self.__commands.remove(tmp[0])
             return True
         return False
+
+    def remove_child_commands(self, obj):
+        if not obj.command_id:
+            return False
+        for x in self.__commands:
+            if obj.command_id in x.parent_block_command_ids:
+                self.remove_command(x)
+        return True
 
     def set_command(self, obj):
         self.__commands.append(obj)

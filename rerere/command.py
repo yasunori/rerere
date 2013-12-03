@@ -10,6 +10,7 @@ class Command:
     pair_command_name = None
     is_block_command = False
     is_block_start = False
+    parent_block_command_ids = []
 
     def __init__(self, command_manager, text_manager, line):
         self.command_manager = command_manager
@@ -23,6 +24,7 @@ class Command:
         ret += ' / keys:' + ','.join(self.keys)
         ret += ' / pattern:' + self.pattern
         ret += ' / command_id:' + self.command_id
+        ret += ' / parent_block_command_ids:' + ','.join(self.parent_block_command_ids)
         return ret
 
     def __repr__(self):
@@ -30,6 +32,8 @@ class Command:
         ret += ' / keys:' + ','.join(self.keys)
         ret += ' / pattern:' + self.pattern
         ret += ' / command_id:' + self.command_id
+        ret += ' / parent_block_command_ids:' + ','.join(self.parent_block_command_ids)
+        ret += '\n'
         return ret
 
     def start(self):
@@ -129,6 +133,7 @@ class Loopcommand(Command):
         self.command_manager.clear_loop_counter(self.command_id)
         self.command_manager.move_index_to_pair_command(self)
         self.command_manager.remove_command(self)
+        self.command_manager.remove_child_commands(self)
         return True
 
     def not_match(self):
