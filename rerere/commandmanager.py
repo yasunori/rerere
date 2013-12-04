@@ -38,9 +38,9 @@ class CommandManager:
                 ret['attributes'] = {x2[0]: x2[1][1:-1] for x2 in [x.split('=') for x in tmp]}
             else:
                 # 代入のコマンドとする
-                ret['keys'] = [x.replace(START_SYMBOL + '=', '').replace(END_SYMBOL, '') for x in re.findall(r'' + START_SYMBOL + '=' + '[0-9A-z%]+' + END_SYMBOL, line)]
+                ret['keys'] = [x.replace(START_SYMBOL + '=', '').replace(END_SYMBOL, '') for x in re.findall(r'' + START_SYMBOL + '=' + '[0-9A-z%\[\]\+]+' + END_SYMBOL, line)]
                 ret['attributes'] = {}
-                ret['attributes']['pattern'] = re.sub(r'' + START_SYMBOL + '=' + '[0-9A-z%]+' + END_SYMBOL, '', line)
+                ret['attributes']['pattern'] = re.sub(r'' + START_SYMBOL + '=' + '[0-9A-z%\[\]\+]+' + END_SYMBOL, '', line)
                 ret['command_name'] = 'search'
         else:
             # ただの正規表現。代入なし
@@ -76,7 +76,7 @@ class CommandManager:
             if command.is_block_start:
                 if not command.command_id:
                     command.command_id = str(uuid.uuid4())
-                    set_block(command.command_name, command.command_id)
+                set_block(command.command_name, command.command_id)
             else:
                 command.command_id = get_current_command_id(command.pair_command_name)
                 delete_current_command_id(command.pair_command_name)
@@ -148,6 +148,12 @@ class CommandManager:
             if target == v:
                 return i
         return None
+
+    def get_commands_all(self):
+        return self.__commands_all
+
+    def get_commands(self):
+        return self.__commands
 
     def search_pair_command_index(self, command):
         for i, v in enumerate(self.__commands_all):

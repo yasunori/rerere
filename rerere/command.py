@@ -19,14 +19,6 @@ class Command:
         self.pattern = line.get('attributes', {}).get('pattern', '')
         self.command_id = line.get('attributes', {}).get('id', '')
 
-    def __str__(self):
-        ret = self.command_name
-        ret += ' / keys:' + ','.join(self.keys)
-        ret += ' / pattern:' + self.pattern
-        ret += ' / command_id:' + self.command_id
-        ret += ' / parent_block_command_ids:' + ','.join(self.parent_block_command_ids)
-        return ret
-
     def __repr__(self):
         ret = self.command_name
         ret += ' / keys:' + ','.join(self.keys)
@@ -42,7 +34,7 @@ class Command:
         正規表現としての評価はまだ実施されていません。
         @return 評価するコマンドリストのカーソルを次行へ進めて再帰的にコマンド構築処理をする場合True
         """
-        return False
+        pass
 
     def match(self, search):
         """
@@ -50,14 +42,14 @@ class Command:
         @param search マッチしたオブジェクト
         @return 評価対象のテキストのカーソルを次行へ進める場合True
         """
-        return True
+        pass
 
     def not_match(self):
         """
         マッチしなかったときに呼ばれる関数。
         @return 評価対象のテキストのカーソルを次行へ進める場合True
         """
-        return False
+        pass
 
 
 class Anycommand(Command):
@@ -69,12 +61,6 @@ class Anycommand(Command):
 
     def start(self):
         return True
-
-    def match(self, search):
-        return True
-
-    def not_match(self):
-        return False
 
 
 class Ifcommand(Command):
@@ -134,6 +120,7 @@ class Loopcommand(Command):
         self.command_manager.move_index_to_pair_command(self)
         self.command_manager.remove_command(self)
         self.command_manager.remove_child_commands(self)
+        self.text_manager.move_index_to_same_line()
         return True
 
     def not_match(self):
@@ -178,6 +165,11 @@ class Searchcommand(Command):
                     if not key in self.text_manager.ret:
                         self.text_manager.ret[key] = []
                     self.text_manager.ret[key].append(search.group(i + 1))
+                elif '+' in key:
+                    key = key.replace('+', '')
+                    if not key in self.text_manager.ret:
+                        self.text_manager.ret[key] = ''
+                    self.text_manager.ret[key] += (search.group(i + 1))
                 else:
                     self.text_manager.ret[key] = search.group(i + 1)
         self.command_manager.remove_command(self)

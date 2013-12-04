@@ -131,7 +131,7 @@ def teardown():
     pass
 
 
-def total_1_test():
+def it_1_test():
     ret = rerere.search(mask1, test1)
     eq_(ret['order_no'], '200068-20130000-0538897137')
     eq_(ret['insert_date'], '2013-08-15 18:18:46')
@@ -158,7 +158,7 @@ def total_1_test():
     eq_(ret['total'], '1,779')
 
 
-def total_2_test():
+def it_2_test():
     ret = rerere.search(mask2, test1)
     eq_(ret['order_no'], '200068-20130000-0538897137')
     eq_(ret['insert_date'], '2013-08-15 18:18:46')
