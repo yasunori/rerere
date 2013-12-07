@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from rerere.commandmanager import CommandManager
-from rerere.textmanager import TextManager
+from .commandmanager import CommandManager
+from .textmanager import TextManager
 
 
 def search(mask_str, dt):

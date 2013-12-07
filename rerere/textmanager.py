@@ -11,28 +11,52 @@ class TextManager:
     def move_index_to_same_line(self):
         self.__i -= 1
 
+    def get_current_line(self):
+        return self.list[self.__i]
+
+    def get_line_number(self):
+        return self.__i
+
+    def set_line_number(self, i):
+        self.__i = i
+
+    def search(self, line, pattern):
+        pattern = re.compile(pattern)
+        return pattern.search(line)
+
     def execute(self, command_manager, start=0, end=-1):
         self.__i = start - 1
         try:
             commands = command_manager.next()
-            while True:
+        except IndexError:
+            return self.ret
+
+        while True:
+            try:
                 self.__i += 1
                 if end >= 0 and self.__i >= end:
                     break
 
-                line = self.list[self.__i]
+                line = self.get_current_line()
 
                 for mindex, command in enumerate(commands):
-                    pattern = re.compile(command.pattern)
-                    tmp = pattern.search(line)
+                    tmp = self.search(line, command.pattern)
                     if tmp:
                         if command.match(tmp):
                             commands = command_manager.next()
                             break
                     else:
-                        if command.not_match():
+                        if command.unmatch():
                             commands = command_manager.next()
                             break
-            return self.ret
-        except IndexError:
-            return self.ret
+            except IndexError:
+                if commands:
+                    tmp = False
+                    for v in commands:
+                        if v.remain():
+                            tmp = True
+                    if tmp:
+                        commands = command_manager.next()
+                        continue
+                return self.ret
+        return self.ret

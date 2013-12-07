@@ -18,6 +18,7 @@ class Command:
         self.keys = line.get('keys', [])
         self.pattern = line.get('attributes', {}).get('pattern', '')
         self.command_id = line.get('attributes', {}).get('id', '')
+        self.attributes = line.get('attributes', {})
 
     def __repr__(self):
         ret = self.command_name
@@ -44,10 +45,17 @@ class Command:
         """
         pass
 
-    def not_match(self):
+    def unmatch(self):
         """
         マッチしなかったときに呼ばれる関数。
         @return 評価対象のテキストのカーソルを次行へ進める場合True
+        """
+        pass
+
+    def remain(self):
+        """
+        テキストの評価が最後まで行ったときに、コマンドが残っていたときに呼ばれる関数。
+        @return テキストの評価を再開する場合True
         """
         pass
 
@@ -63,12 +71,18 @@ class Anycommand(Command):
         return True
 
 
+'''
 class Ifcommand(Command):
 
     command_name = 'if'
     pair_command_name = 'endif'
     is_block_command = True
     is_block_start = True
+
+    def __init__(self, command_manager, text_manager, line):
+        Command.__init__(self, command_manager, text_manager, line)
+        if self.attributes.get('match', None):
+            self.pattern = self.attributes['match']
 
     def start(self):
         self.command_manager.set_command(self)
@@ -79,10 +93,87 @@ class Ifcommand(Command):
         self.text_manager.move_index_to_same_line()
         return True
 
-    def not_match(self):
+    def unmatch(self):
         self.command_manager.move_index_to_pair_command(self)
         self.command_manager.remove_command(self)
         self.text_manager.move_index_to_same_line()
+        return True
+
+    def remain(self):
+        return False
+
+
+class Endifcommand(Command):
+
+    command_name = 'endif'
+    pair_command_name = 'if'
+    is_block_command = True
+    is_block_start = False
+
+    def start(self):
+        return True
+
+    def match(self, search):
+        return True
+
+    def unmatch(self):
+        return False
+
+    def remain(self):
+        return False
+'''
+
+class Ifcommand(Command):
+
+    command_name = 'if'
+    pair_command_name = 'endif'
+    is_block_command = True
+    is_block_start = True
+
+    def __init__(self, command_manager, text_manager, line):
+        Command.__init__(self, command_manager, text_manager, line)
+        if self.attributes.get('match', None):
+            self.pattern = self.attributes['match']
+        if self.attributes.get('exit', None):
+            self.exit = self.attributes['exit']
+        if self.attributes.get('limit', None):
+            self.limit = int(self.attributes['limit'])
+
+    def start(self):
+        # textの行を記憶(最悪戻るため)
+        self.text_start_line_number = self.text_manager.get_line_number()
+        self.command_manager.set_command(self)
+        return False
+
+    def match(self, search):
+        self.command_manager.remove_command(self)
+        self.text_manager.move_index_to_same_line()
+        return True
+
+    def __clear(self):
+        self.command_manager.move_index_to_pair_command(self)
+        self.command_manager.remove_command(self)
+        self.command_manager.remove_child_commands(self)
+        # txtの評価を無かったことにする
+        self.text_manager.set_line_number(self.text_start_line_number)
+
+    def unmatch(self):
+
+        if hasattr(self, 'limit'):
+            if self.text_manager.get_line_number() - self.text_start_line_number >= self.limit:
+                self.__clear()
+                return True
+
+        # exitのパターンがあったら
+        if hasattr(self, 'exit'):
+            if self.text_manager.search(self.text_manager.get_current_line(), self.exit):
+                self.__clear()
+                return True
+
+        return False
+
+    def remain(self):
+        self.__clear()
         return True
 
 
@@ -99,7 +190,60 @@ class Endifcommand(Command):
     def match(self, search):
         return True
 
-    def not_match(self):
+    def unmatch(self):
+        return False
+
+    def remain(self):
+        return False
+
+
+class Blockcommand(Command):
+
+    command_name = 'block'
+    pair_command_name = 'endblock'
+    is_block_command = True
+    is_block_start = True
+
+    def __init__(self, command_manager, text_manager, line):
+        Command.__init__(self, command_manager, text_manager, line)
+        if self.attributes.get('exit', None):
+            self.pattern = self.attributes['exit']
+
+    def start(self):
+        self.command_manager.set_command(self)
+        return True
+
+    def match(self, search):
+        self.command_manager.move_index_to_pair_command(self)
+        self.command_manager.remove_command(self)
+        self.command_manager.remove_child_commands(self)
+        self.text_manager.move_index_to_same_line()
+        return True
+
+    def unmatch(self):
+        return False
+
+    def remain(self):
+        return False
+
+
+class Endblockcommand(Command):
+
+    command_name = 'endblock'
+    pair_command_name = 'block'
+    is_block_command = True
+    is_block_start = False
+
+    def start(self):
+        return True
+
+    def match(self, search):
+        return True
+
+    def unmatch(self):
+        return False
+
+    def remain(self):
         return False
 
 
@@ -109,6 +253,11 @@ class Loopcommand(Command):
     pair_command_name = 'endloop'
     is_block_command = True
     is_block_start = True
+
+    def __init__(self, command_manager, text_manager, line):
+        Command.__init__(self, command_manager, text_manager, line)
+        if self.attributes.get('exit', None):
+            self.pattern = self.attributes['exit']
 
     def start(self):
         self.command_manager.add_loop_counter(self.command_id)
@@ -123,7 +272,10 @@ class Loopcommand(Command):
         self.text_manager.move_index_to_same_line()
         return True
 
-    def not_match(self):
+    def unmatch(self):
+        return False
+
+    def remain(self):
         return False
 
 
@@ -143,7 +295,10 @@ class Endloopcommand(Command):
     def match(self, search):
         return True
 
-    def not_match(self):
+    def unmatch(self):
+        return False
+
+    def remain(self):
         return False
 
 
@@ -175,5 +330,8 @@ class Searchcommand(Command):
         self.command_manager.remove_command(self)
         return True
 
-    def not_match(self):
+    def unmatch(self):
+        return False
+
+    def remain(self):
         return False

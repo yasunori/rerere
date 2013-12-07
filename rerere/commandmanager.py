@@ -2,7 +2,7 @@
 import re
 import sys
 import uuid
-from rerere.command import *
+from .command import *
 
 START_SYMBOL = '<<'
 END_SYMBOL = '>>'
@@ -16,7 +16,6 @@ class CommandManager:
         self.__commands_all = []  # すべてのコマンド
         self.__lines = []  # すべての行（構文解析後)
         self.__loop_counter = {}
-        self.__command_master = ['@if', '@endif', '@loop', '@endloop', '@search', '@any']
         self.__text_manager = text_manager
 
         self.__lines = list(map(lambda x: self.__parse(x), mask_str.split('\n')))
@@ -25,6 +24,9 @@ class CommandManager:
         self.__complement_parent_command_id()
 
     def __parse(self, line):
+        if not line and START_SYMBOL + "#" in line:  # まずコメントをきれいに無くす
+            line = line[0: line.find(START_SYMBOL + "#")]
+
         if not line:
             line = START_SYMBOL + '@any' + END_SYMBOL  # 空行はanyコマンドにしておく
 
@@ -33,9 +35,9 @@ class CommandManager:
         ret = {}
         if main_str:
             tmp = re.split(r'\s+', main_str.group(1))
-            if tmp[0] in self.__command_master:  # コマンドではじまっている
+            if '@' in tmp[0]:
                 ret['command_name'] = tmp.pop(0).replace('@', '')
-                ret['attributes'] = {x2[0]: x2[1][1:-1] for x2 in [x.split('=') for x in tmp]}
+                ret['attributes'] = {x2[0].strip(' \'"'): x2[1].strip(' \'"') for x2 in [x.split('=') for x in tmp]}
             else:
                 # 代入のコマンドとする
                 ret['keys'] = [x.replace(START_SYMBOL + '=', '').replace(END_SYMBOL, '') for x in re.findall(r'' + START_SYMBOL + '=' + '[0-9A-z%\[\]\+]+' + END_SYMBOL, line)]
