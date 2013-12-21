@@ -56,7 +56,10 @@ class TextManager:
                         if v.remain():
                             tmp = True
                     if tmp:
-                        commands = command_manager.next()
-                        continue
+                        try:
+                            commands = command_manager.next()
+                            continue
+                        except IndexError:
+                            return self.ret
                 return self.ret
         return self.ret

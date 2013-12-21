@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
+import abc
 
 
-class Command:
+class CommandException(Exception):
+    def __init__(self, message):
+        self.message = message
+
+
+class Command(object, metaclass=abc.ABCMeta):
     """
     コマンドを表します
     """
@@ -18,7 +24,10 @@ class Command:
         self.keys = line.get('keys', [])
         self.pattern = line.get('attributes', {}).get('pattern', '')
         self.command_id = line.get('attributes', {}).get('id', '')
+        self.search_mode = line.get('attributes', {}).get('search_mode', '')
         self.attributes = line.get('attributes', {})
+        self.line = line.get('line', '')
+        self.unmatch_count = 0
 
     def __repr__(self):
         ret = self.command_name
@@ -29,6 +38,7 @@ class Command:
         ret += '\n'
         return ret
 
+    @abc.abstractmethod
     def start(self):
         """
         コマンドマネージャがこのコマンドにカーソルを合わせたときに呼ばれる関数。
@@ -37,6 +47,7 @@ class Command:
         """
         pass
 
+    @abc.abstractmethod
     def match(self, search):
         """
         マッチしたときに呼ばれる関数。
@@ -45,6 +56,7 @@ class Command:
         """
         pass
 
+    @abc.abstractmethod
     def unmatch(self):
         """
         マッチしなかったときに呼ばれる関数。
@@ -52,6 +64,7 @@ class Command:
         """
         pass
 
+    @abc.abstractmethod
     def remain(self):
         """
         テキストの評価が最後まで行ったときに、コマンドが残っていたときに呼ばれる関数。
@@ -70,58 +83,15 @@ class Anycommand(Command):
     def start(self):
         return True
 
-
-'''
-class Ifcommand(Command):
-
-    command_name = 'if'
-    pair_command_name = 'endif'
-    is_block_command = True
-    is_block_start = True
-
-    def __init__(self, command_manager, text_manager, line):
-        Command.__init__(self, command_manager, text_manager, line)
-        if self.attributes.get('match', None):
-            self.pattern = self.attributes['match']
-
-    def start(self):
-        self.command_manager.set_command(self)
-        return False
-
     def match(self, search):
-        self.command_manager.remove_command(self)
-        self.text_manager.move_index_to_same_line()
-        return True
+        pass
 
     def unmatch(self):
-        self.command_manager.move_index_to_pair_command(self)
-        self.command_manager.remove_command(self)
-        self.text_manager.move_index_to_same_line()
-        return True
+        pass
 
     def remain(self):
-        return False
+        pass
 
-
-class Endifcommand(Command):
-
-    command_name = 'endif'
-    pair_command_name = 'if'
-    is_block_command = True
-    is_block_start = False
-
-    def start(self):
-        return True
-
-    def match(self, search):
-        return True
-
-    def unmatch(self):
-        return False
-
-    def remain(self):
-        return False
-'''
 
 class Ifcommand(Command):
 
@@ -138,6 +108,11 @@ class Ifcommand(Command):
             self.exit = self.attributes['exit']
         if self.attributes.get('limit', None):
             self.limit = int(self.attributes['limit'])
+        if self.search_mode == 'single':
+            self.limit = 1
+
+        if not self.pattern:
+            raise CommandException('Error at line ' + self.line)
 
     def start(self):
         # textの行を記憶(最悪戻るため)
@@ -158,6 +133,7 @@ class Ifcommand(Command):
         self.text_manager.set_line_number(self.text_start_line_number)
 
     def unmatch(self):
+        self.unmatch_count += 1
 
         if hasattr(self, 'limit'):
             if self.text_manager.get_line_number() - self.text_start_line_number >= self.limit:
@@ -209,6 +185,9 @@ class Blockcommand(Command):
         if self.attributes.get('exit', None):
             self.pattern = self.attributes['exit']
 
+        if not self.pattern:
+            raise CommandException('Error at line ' + self.line)
+
     def start(self):
         self.command_manager.set_command(self)
         return True
@@ -221,6 +200,7 @@ class Blockcommand(Command):
         return True
 
     def unmatch(self):
+        self.unmatch_count += 1
         return False
 
     def remain(self):
@@ -259,6 +239,9 @@ class Loopcommand(Command):
         if self.attributes.get('exit', None):
             self.pattern = self.attributes['exit']
 
+        if not self.pattern:
+            raise CommandException('Error at line ' + self.line)
+
     def start(self):
         self.command_manager.add_loop_counter(self.command_id)
         self.command_manager.set_command(self)
@@ -273,6 +256,7 @@ class Loopcommand(Command):
         return True
 
     def unmatch(self):
+        self.unmatch_count += 1
         return False
 
     def remain(self):
@@ -308,6 +292,11 @@ class Searchcommand(Command):
     pair_command_name = None
     is_block_command = False
 
+    def __init__(self, command_manager, text_manager, line):
+        Command.__init__(self, command_manager, text_manager, line)
+        if not self.pattern:
+            raise CommandException('Error at line ' + self.line)
+
     def start(self):
         self.command_manager.set_command(self)
         return False
@@ -331,6 +320,18 @@ class Searchcommand(Command):
         return True
 
     def unmatch(self):
+        self.unmatch_count += 1
+        if self.search_mode == 'single':
+            self.command_manager.remove_command(self)
+            self.text_manager.move_index_to_same_line()
+            return True
+        elif self.search_mode == 'multi':
+            if self.unmatch_count == 1:
+                self.text_manager.move_index_to_same_line()
+                return True
+            else:
+                return False
+
         return False
 
     def remain(self):

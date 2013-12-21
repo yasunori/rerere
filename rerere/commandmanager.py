@@ -11,52 +11,86 @@ END_SYMBOL = '>>'
 class CommandManager:
 
     def __init__(self, mask_str, text_manager):
-        self.__i = -1
-        self.__commands = []  # 比較中のコマンド
-        self.__commands_all = []  # すべてのコマンド
-        self.__lines = []  # すべての行（構文解析後)
-        self.__loop_counter = {}
-        self.__text_manager = text_manager
+        try:
+            self.__i = -1
+            self.__commands = []  # 比較中のコマンド
+            self.__commands_all = []  # すべてのコマンド
+            self.__lines = []  # すべての行（構文解析後)
+            self.__loop_counter = {}
+            self.__text_manager = text_manager
 
-        self.__lines = list(map(lambda x: self.__parse(x), mask_str.split('\n')))
-        self.__commands_all = list(map(lambda x: self.__convert_command(x), self.__lines))
-        self.__complement_command_id()
-        self.__complement_parent_command_id()
+            self.__lines = list(map(lambda x: self.__parse(x), mask_str.split('\n')))
+            self.__commands_all = list(map(lambda x: self.__convert_command(x), self.__lines))
+            self.__complement_command_id()
+            self.__complement_parent_command_id()
+            self.__check_commands_pair()
+        except KeyError as ke:
+            raise CommandException('Error at line ' + str(ke.message))
+        except IndexError as ie:
+            raise CommandException('Error at line ' + str(ie.message))
+        except CommandException as ce:
+            raise ce
 
     def __parse(self, line):
-        if not line and START_SYMBOL + "#" in line:  # まずコメントをきれいに無くす
-            line = line[0: line.find(START_SYMBOL + "#")]
+        try:
+            if line and START_SYMBOL + '#' in line:  # まずコメントをきれいに無くす
+                line = line[0: line.find(START_SYMBOL + '#')]
 
-        if not line:
-            line = START_SYMBOL + '@any' + END_SYMBOL  # 空行はanyコマンドにしておく
+            search_mode = None
+            if '!' + END_SYMBOL in line:
+                line = line.replace('!' + END_SYMBOL, END_SYMBOL)
+                search_mode = 'single'
 
-        command_main = re.compile(r'' + START_SYMBOL + '(.+)' + END_SYMBOL)
-        main_str = command_main.search(line)
-        ret = {}
-        if main_str:
-            tmp = re.split(r'\s+', main_str.group(1))
-            if '@' in tmp[0]:
-                ret['command_name'] = tmp.pop(0).replace('@', '')
-                ret['attributes'] = {x2[0].strip(' \'"'): x2[1].strip(' \'"') for x2 in [x.split('=') for x in tmp]}
+            if '?' + END_SYMBOL in line:
+                line = line.replace('?' + END_SYMBOL, END_SYMBOL)
+                search_mode = 'multi'
+
+            if not line:
+                line = START_SYMBOL + '@any' + END_SYMBOL  # 空行はanyコマンドにしておく
+
+            command_main = re.compile(r'' + START_SYMBOL + '(.+)' + END_SYMBOL)
+            main_match = command_main.search(line)
+            ret = {}
+            if main_match:
+                main_str = main_match.group(1)
+                main_str = re.sub(r'\s+=\s+', '=', main_str).strip()  # きれいにする。=まわりのスペースと、前後のスペース
+                tmp = re.split(r'\s+', main_str)
+                if '@' in tmp[0]:
+                    ret['command_name'] = tmp.pop(0).replace('@', '')
+                    ret['attributes'] = {x2[0].strip(' \'"'): x2[1].strip(' \'"') for x2 in [x.split('=') for x in tmp]}
+                else:
+                    # 代入のコマンドとする
+                    ret['keys'] = [x.replace(START_SYMBOL + '=', '').replace(END_SYMBOL, '').strip() for x in re.findall(r'' + START_SYMBOL + '=' + '[0-9A-z%\[\]\+\s]+' + END_SYMBOL, line)]
+                    ret['attributes'] = {}
+                    ret['attributes']['pattern'] = re.sub(r'' + START_SYMBOL + '=' + '[0-9A-z%\[\]\+\s]+' + END_SYMBOL, '', line).strip()
+                    ret['command_name'] = 'search'
             else:
-                # 代入のコマンドとする
-                ret['keys'] = [x.replace(START_SYMBOL + '=', '').replace(END_SYMBOL, '') for x in re.findall(r'' + START_SYMBOL + '=' + '[0-9A-z%\[\]\+]+' + END_SYMBOL, line)]
+                # ただの正規表現。代入なし
+                ret['keys'] = []
                 ret['attributes'] = {}
-                ret['attributes']['pattern'] = re.sub(r'' + START_SYMBOL + '=' + '[0-9A-z%\[\]\+]+' + END_SYMBOL, '', line)
+                ret['attributes']['pattern'] = line
                 ret['command_name'] = 'search'
-        else:
-            # ただの正規表現。代入なし
-            ret['keys'] = []
-            ret['attributes'] = {}
-            ret['attributes']['pattern'] = line
-            ret['command_name'] = 'search'
 
-        return ret
+            if search_mode:
+                ret['attributes']['search_mode'] = search_mode
+
+            ret['line'] = line
+
+            return ret
+        except IndexError as ie:
+            ie.message = line
+            raise ie
 
     def __convert_command(self, line):
-        class_c = globals()[line['command_name'].capitalize() + 'command']
-        obj = class_c(self, self.__text_manager, line)
-        return obj
+        try:
+            class_c = globals()[line['command_name'].capitalize() + 'command']
+            obj = class_c(self, self.__text_manager, line)
+            return obj
+        except KeyError as ke:
+            ke.message = line
+            raise ke
+        except CommandException as ce:
+            raise ce
 
     def __complement_command_id(self):
         block = {}
@@ -107,6 +141,13 @@ class CommandManager:
                     set_block(command.command_name, command.command_id)
                 else:
                     delete_current_command_id(command.pair_command_name)
+
+    def __check_commands_pair(self):
+        for command in self.__commands_all:
+            if not command.is_block_command:
+                continue
+            if not self.search_pair_command_index(command):
+                raise CommandException('Can\'t find pair command of ' + command.line)
 
     def remove_command(self, obj):
         tmp = [x for x in self.__commands if x == obj]
@@ -189,4 +230,6 @@ class CommandManager:
 
             return self.__commands
         except IndexError as e:
+            if self.__commands:  # ? のコマンドなどが残っていれば、評価を続ける
+                return self.__commands
             raise e

@@ -126,6 +126,79 @@ def search_4_test():
     eq_(ret['item_detail'], 'これはとても良い商品です。新鮮でおいしいよ。')
 
 
+def search_5_test():
+    '''
+    すぐ判断する場合 OKの場合
+    '''
+
+    txt = '''
+[商品]あいうえお(新発売)
+[個数]3個
+[備考]あああ
+'''
+    re_txt = '''
+\[商品\](\S+)<<=item_name>>
+\[個数\]([0-9])<<=item_count !>>個
+\[備考\](\S+)<<=item_comment>>
+'''
+
+    text_manager = rerere.TextManager(txt)
+    command_manager = rerere.CommandManager(re_txt, text_manager)
+    ret = text_manager.execute(command_manager=command_manager)
+    eq_(ret['item_name'], 'あいうえお(新発売)')
+    eq_(ret['item_count'], '3')
+    eq_(ret['item_comment'], 'あああ')
+
+
+def search_6_test():
+    '''
+    すぐ判断する場合 NGの場合 空行のせいで駄目
+    '''
+
+    txt = '''
+[商品]あいうえお(新発売)
+
+[個数]3個
+[備考]あああ
+'''
+    re_txt = '''
+\[商品\](\S+)<<=item_name>>
+\[個数\]([0-9])<<=item_count !>>個
+\[備考\](\S+)<<=item_comment>>
+'''
+
+    text_manager = rerere.TextManager(txt)
+    command_manager = rerere.CommandManager(re_txt, text_manager)
+    ret = text_manager.execute(command_manager=command_manager)
+    eq_(ret['item_name'], 'あいうえお(新発売)')
+    eq_(ret.get('item_count', None), None)
+    eq_(ret['item_comment'], 'あああ')
+
+
+def search_7_test():
+    '''
+    判断あとでもいい場合
+    '''
+
+    txt = '''
+[商品]あいうえお(新発売)
+[個数]3個
+[備考]あああ
+'''
+    re_txt = '''
+\[商品\](\S+)<<=item_name>>
+\[備考\](\S+)<<=item_comment ?>>
+\[個数\]([0-9])<<=item_count>>個
+'''
+
+    text_manager = rerere.TextManager(txt)
+    command_manager = rerere.CommandManager(re_txt, text_manager)
+    ret = text_manager.execute(command_manager=command_manager)
+    eq_(ret['item_name'], 'あいうえお(新発売)')
+    eq_(ret['item_count'], '3')
+    eq_(ret['item_comment'], 'あああ')
+
+
 def if_1_test():
     '''
     if okのパターン
