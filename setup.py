@@ -39,6 +39,6 @@ setup(
         'Programming Language :: Python',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Utilities',
-        'Topic :: Documentation',
+        'Topic :: Documentation'
     ]
 )
