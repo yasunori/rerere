@@ -5,7 +5,7 @@ rerere
 A multiline
 
 """
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 setup(
@@ -19,6 +19,7 @@ setup(
     maintainer_email='yasunori@gotoh.me',
     description='',
     long_description=__doc__,
+    packages=find_packages(),
     py_modules=[
         'rerere'
     ],
