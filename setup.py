@@ -17,7 +17,7 @@ setup(
     author_email='yasunori@gotoh.me',
     maintainer='Yasunori Gotoh',
     maintainer_email='yasunori@gotoh.me',
-    description='',
+    description='rerere is multistring python search',
     long_description=__doc__,
     packages=find_packages(),
     py_modules=[
